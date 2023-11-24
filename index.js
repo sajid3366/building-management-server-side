@@ -30,23 +30,34 @@ async function run() {
     await client.connect();
 
     const userCollection = client.db('homeDB').collection('users');
+    const apartmentCollection = client.db('homeDB').collection('apartments');
 
 
 
     // for user 
-    app.get('/users', async(req, res) =>{
-        const user = req.body;
-        const result = await userCollection.find().toArray()
-        res.send(result)
+    app.get('/users', async (req, res) => {
+      const result = await userCollection.find().toArray()
+      res.send(result)
     })
-    app.post('/users', async(req, res) =>{
-        const user = req.body;
-        const result = await userCollection.insertOne(user)
-        res.send(result);
+    app.post('/users', async (req, res) => {
+      const user = req.body;
+      const result = await userCollection.insertOne(user)
+      res.send(result);
     })
-    
 
+    // apartment management
+    app.get('/apartments', async(req, res) =>{
+      const page = parseInt(req.query.page);
+      const size = parseInt(req.query.size);
+      const apartment = await apartmentCollection.find().skip(page * size).limit(size).toArray();
+      res.send(apartment)
+    })
 
+    // for pagination count
+    app.get('/countApartment', async (req, res) => {
+      const count = await apartmentCollection.estimatedDocumentCount();
+      res.send({ count });
+    })
 
 
 
@@ -70,7 +81,7 @@ run().catch(console.dir);
 
 
 app.get('/', async (req, res) => {
-    res.send('smart build is running');
+  res.send('smart build is running');
 })
 // app.all('*', async (req, res, next) => {
 //     const error = new Error(`invalid path ${req.originalUrl}`)
@@ -85,5 +96,5 @@ app.get('/', async (req, res) => {
 // })
 
 app.listen(port, () => {
-    console.log(`Smart build server is running on port ${port}`);
+  console.log(`Smart build server is running on port ${port}`);
 });
