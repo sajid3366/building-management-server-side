@@ -1,6 +1,6 @@
 const express = require('express');
 const cors = require('cors');
-const { MongoClient, ServerApiVersion } = require('mongodb');
+const { MongoClient, ServerApiVersion, ObjectId } = require('mongodb');
 require('dotenv').config()
 const app = express();
 const port = process.env.PORT || 5000;
@@ -31,6 +31,8 @@ async function run() {
 
     const userCollection = client.db('homeDB').collection('users');
     const apartmentCollection = client.db('homeDB').collection('apartments');
+    const agreementCollection = client.db('homeDB').collection('agreements');
+    const announcementCollection = client.db('homeDB').collection('announcements');
 
 
 
@@ -44,14 +46,56 @@ async function run() {
       const result = await userCollection.insertOne(user)
       res.send(result);
     })
+    app.get('/users/admin/:email', async (req, res) => {
+      const email = req.params.email;
+
+      const query = { email: email }
+      const user = await userCollection.findOne(query);
+      let admin = false;
+      if (user) {
+        admin = user?.role === 'admin';
+      }
+      res.send({ admin })
+    })
+    app.get('/users/member/:email', async (req, res) => {
+      const email = req.params.email;
+      const query = { email: email }
+      const user = await userCollection.findOne(query);
+      let member = false;
+      if (user) {
+        member = user?.role === 'member';
+      }
+      res.send({ member })
+    })
+    app.get('/users/:role', async (req, res) => {
+      const member = 'member';
+      // const role = req.params.role;
+      const query = { role: member }
+      const result = await userCollection.find(query).toArray();
+      res.send(result)
+
+    })
+    app.patch('/users/:id', async (req, res) => {
+      const id = req.params.id;
+      const filter = {_id: new ObjectId(id)}
+      const updateDoc = {
+        $set: {
+          role: ''
+        },
+      };
+      const result = await userCollection.updateOne(filter, updateDoc)
+      res.send(result)
+    })
+
 
     // apartment management
-    app.get('/apartments', async(req, res) =>{
+    app.get('/apartments', async (req, res) => {
       const page = parseInt(req.query.page);
       const size = parseInt(req.query.size);
       const apartment = await apartmentCollection.find().skip(page * size).limit(size).toArray();
       res.send(apartment)
     })
+
 
     // for pagination count
     app.get('/countApartment', async (req, res) => {
@@ -59,9 +103,42 @@ async function run() {
       res.send({ count });
     })
 
+    // agreement related api
+    app.post('/agreement', async (req, res) => {
+      const agreement = req.body;
+      // console.log('agreement', agreement);
+      const result = await agreementCollection.insertOne(agreement);
+      res.send(result)
+    });
+    app.get('/agreement/:email', async (req, res) => {
+      const email = req.params.email;
+      const query = { email: email };
+      const result = await agreementCollection.find(query).toArray();
+      res.send(result)
+    })
+    app.patch('/agreement/:id', async (req, res) => {
+      const id = req.params.id;
+      const date = req.body.month;
+      const filter = { _id: new ObjectId(id) }
 
+      // console.log(id, date);
+      const options = { upsert: true };
+      const updateDoc = {
+        $set: {
+          month: date
+        },
+      };
 
+      const result = await agreementCollection.updateOne(filter, updateDoc, options)
+      res.send(result)
+    })
 
+    // announcement realted api
+    app.post('/announcement', async(req, res) =>{
+      const announcement = req.body;
+      const result = await announcementCollection.insertOne(announcement);
+      res.send(result)
+    })
 
 
 
