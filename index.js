@@ -1,5 +1,6 @@
 const express = require('express');
 const cors = require('cors');
+const jwt = require('jsonwebtoken')
 const { MongoClient, ServerApiVersion, ObjectId } = require('mongodb');
 require('dotenv').config()
 const app = express();
@@ -35,6 +36,13 @@ async function run() {
     const announcementCollection = client.db('homeDB').collection('announcements');
 
 
+    // jwt related api 
+    app.post('/jwt', async (req, res) => {
+      const user = req.body;
+      const token = jwt.sign(user, process.env.ACCESS_TOKEN_SECRET, { expiresIn: '1h' })
+      res.send({ token })
+    })
+
 
     // for user 
     app.get('/users', async (req, res) => {
@@ -46,9 +54,11 @@ async function run() {
       const result = await userCollection.insertOne(user)
       res.send(result);
     })
+    app.patch('/users', async(req, res) =>{
+      const 
+    })
     app.get('/users/admin/:email', async (req, res) => {
       const email = req.params.email;
-
       const query = { email: email }
       const user = await userCollection.findOne(query);
       let admin = false;
@@ -104,6 +114,12 @@ async function run() {
     })
 
     // agreement related api
+    app.get('/agreement/:status', async(req, res) =>{
+      const status = 'pending';
+      const query = {status: status}
+      const agreement = await agreementCollection.find(query).toArray();
+      res.send(agreement);
+    })
     app.post('/agreement', async (req, res) => {
       const agreement = req.body;
       // console.log('agreement', agreement);
@@ -116,19 +132,29 @@ async function run() {
       const result = await agreementCollection.find(query).toArray();
       res.send(result)
     })
+    
+    app.patch('/agreement/admin/:id', async(req, res) =>{
+      const id = req.params.id;
+      const filter = {_id : new ObjectId(id)}
+      const options = { upsert: true };
+      const updateDoc = {
+        $set: {
+          status: 'checked'
+        },
+      };
+      const result = await agreementCollection.updateOne(filter, updateDoc, options)
+      res.send(result)
+    })
     app.patch('/agreement/:id', async (req, res) => {
       const id = req.params.id;
       const date = req.body.month;
       const filter = { _id: new ObjectId(id) }
-
-      // console.log(id, date);
       const options = { upsert: true };
       const updateDoc = {
         $set: {
           month: date
         },
       };
-
       const result = await agreementCollection.updateOne(filter, updateDoc, options)
       res.send(result)
     })
@@ -139,8 +165,10 @@ async function run() {
       const result = await announcementCollection.insertOne(announcement);
       res.send(result)
     })
-
-
+    app.get('/announcement', async(req, res) =>{
+      const result = await announcementCollection.find().toArray()
+      res.send(result)
+    })
 
 
 
