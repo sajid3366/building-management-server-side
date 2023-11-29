@@ -3,6 +3,7 @@ const cors = require('cors');
 const jwt = require('jsonwebtoken')
 const { MongoClient, ServerApiVersion, ObjectId } = require('mongodb');
 require('dotenv').config()
+const stripe = require('stripe')(process.env.STRIPE_SECRET_KEY)
 const app = express();
 const port = process.env.PORT || 5000;
 
@@ -34,6 +35,7 @@ async function run() {
     const apartmentCollection = client.db('homeDB').collection('apartments');
     const agreementCollection = client.db('homeDB').collection('agreements');
     const announcementCollection = client.db('homeDB').collection('announcements');
+    const paymentCollection = client.db('homeDB').collection('payments');
 
 
     // jwt related api 
@@ -54,8 +56,18 @@ async function run() {
       const result = await userCollection.insertOne(user)
       res.send(result);
     })
-    app.patch('/users', async(req, res) =>{
-      const 
+    app.patch('/users/:email', async (req, res) => {
+      const email = req.params.email;
+      const filter = { email: email }
+      const options = { upsert: true };
+      const updateDoc = {
+        $set: {
+          role: 'member'
+        },
+      };
+      const result = await userCollection.updateOne(filter, updateDoc, options)
+      res.send(result)
+
     })
     app.get('/users/admin/:email', async (req, res) => {
       const email = req.params.email;
@@ -87,7 +99,7 @@ async function run() {
     })
     app.patch('/users/:id', async (req, res) => {
       const id = req.params.id;
-      const filter = {_id: new ObjectId(id)}
+      const filter = { _id: new ObjectId(id) }
       const updateDoc = {
         $set: {
           role: ''
@@ -114,9 +126,9 @@ async function run() {
     })
 
     // agreement related api
-    app.get('/agreement/:status', async(req, res) =>{
+    app.get('/agreement/:status', async (req, res) => {
       const status = 'pending';
-      const query = {status: status}
+      const query = { status: status }
       const agreement = await agreementCollection.find(query).toArray();
       res.send(agreement);
     })
@@ -126,16 +138,17 @@ async function run() {
       const result = await agreementCollection.insertOne(agreement);
       res.send(result)
     });
-    app.get('/agreement/:email', async (req, res) => {
+    app.get('/agreement/member/:email', async (req, res) => {
       const email = req.params.email;
+      // console.log(email);
       const query = { email: email };
       const result = await agreementCollection.find(query).toArray();
       res.send(result)
     })
-    
-    app.patch('/agreement/admin/:id', async(req, res) =>{
+
+    app.patch('/agreement/admin/:id', async (req, res) => {
       const id = req.params.id;
-      const filter = {_id : new ObjectId(id)}
+      const filter = { _id: new ObjectId(id) }
       const options = { upsert: true };
       const updateDoc = {
         $set: {
@@ -159,13 +172,40 @@ async function run() {
       res.send(result)
     })
 
+    // payment intent
+
+    app.post("/create-payment-intent", async (req, res) => {
+      const { payment } = req.body;
+      const amount = parseInt(payment * 100)
+      // console.log(amount);
+      // Create a PaymentIntent with the order amount and currency
+      const paymentIntent = await stripe.paymentIntents.create({
+        amount: amount,
+        currency: "usd",
+        // In the latest version of the API, specifying the `automatic_payment_methods` parameter is optional because Stripe enables its functionality by default.
+        automatic_payment_methods: {
+          enabled: true,
+        },
+      });
+      
+      res.send({
+        clientSecret: paymentIntent.client_secret,
+      });
+    });
+
+    app.post('/payments', async (req, res) => {
+      const payment = req.body;
+      const paymentResult = await paymentCollection.insertOne(payment);
+      res.send(paymentResult);
+    })
+
     // announcement realted api
-    app.post('/announcement', async(req, res) =>{
+    app.post('/announcement', async (req, res) => {
       const announcement = req.body;
       const result = await announcementCollection.insertOne(announcement);
       res.send(result)
     })
-    app.get('/announcement', async(req, res) =>{
+    app.get('/announcement', async (req, res) => {
       const result = await announcementCollection.find().toArray()
       res.send(result)
     })
